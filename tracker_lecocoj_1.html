@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tracker — LeCocoJ</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; min-height: 100vh; padding: 16px; }
+  h1 { font-size: 18px; font-weight: 600; color: #111; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: #888; margin-bottom: 16px; }
+  .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
+  .stat { background: white; border-radius: 12px; padding: 12px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .stat-val { font-size: 24px; font-weight: 700; color: #111; }
+  .stat-lbl { font-size: 11px; color: #999; margin-top: 2px; }
+  .day-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 12px; scrollbar-width: none; }
+  .day-tabs::-webkit-scrollbar { display: none; }
+  .dtab { flex-shrink: 0; padding: 7px 14px; border-radius: 20px; border: 1.5px solid #e0e0e0; font-size: 13px; font-weight: 500; cursor: pointer; background: white; color: #666; position: relative; }
+  .dtab.active { background: #111; color: white; border-color: #111; }
+  .dtab .badge { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; font-size: 9px; display: flex; align-items: center; justify-content: center; font-weight: 700; border: 2px solid #f5f5f5; }
+  .badge-ok { background: #4CAF50; color: white; }
+  .badge-part { background: #FF9800; color: white; }
+  .day-label { font-size: 13px; font-weight: 600; color: #444; margin-bottom: 10px; }
+  .blocks { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+  .block-row { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; border: 1.5px solid #eee; background: white; cursor: pointer; transition: all .15s; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+  .block-row:active { transform: scale(0.98); }
+  .block-row.done { border-color: #4CAF50; background: #f0fdf0; }
+  .block-row.skip { opacity: 0.4; }
+  .check { width: 22px; height: 22px; border-radius: 6px; border: 2px solid #ddd; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; transition: all .15s; }
+  .block-row.done .check { background: #4CAF50; border-color: #4CAF50; color: white; }
+  .bcat { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+  .binfo { flex: 1; min-width: 0; }
+  .blabel { font-size: 14px; font-weight: 500; color: #111; }
+  .block-row.done .blabel { color: #2e7d32; }
+  .btime { font-size: 11px; color: #999; margin-top: 1px; }
+  .skip-btn { font-size: 11px; color: #bbb; border: 1px solid #e8e8e8; border-radius: 6px; padding: 3px 8px; background: transparent; cursor: pointer; flex-shrink: 0; }
+  .week-section { background: white; border-radius: 12px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.06); margin-bottom: 16px; }
+  .week-title { font-size: 12px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 12px; }
+  .bars { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; align-items: end; height: 70px; }
+  .bar-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+  .bar-fill { width: 100%; border-radius: 4px 4px 0 0; min-height: 4px; transition: height .4s; }
+  .bar-day { font-size: 9px; color: #bbb; font-weight: 500; }
+  .bar-pct { font-size: 9px; color: #999; }
+  .reset-btn { width: 100%; padding: 12px; border-radius: 12px; border: 1.5px solid #eee; background: white; color: #bbb; font-size: 13px; cursor: pointer; }
+  .congrats { background: #f0fdf0; border: 1.5px solid #4CAF50; border-radius: 12px; padding: 12px 16px; text-align: center; font-size: 14px; color: #2e7d32; font-weight: 500; margin-bottom: 12px; display: none; }
+</style>
+</head>
+<body>
+
+<h1>LeCocoJ — Weekly Tracker</h1>
+<p class="subtitle">Coche tes blocs chaque jour 💪</p>
+
+<div class="stats">
+  <div class="stat"><div class="stat-val" id="today-score">0%</div><div class="stat-lbl">Aujourd'hui</div></div>
+  <div class="stat"><div class="stat-val" id="week-score">0%</div><div class="stat-lbl">Cette semaine</div></div>
+  <div class="stat"><div class="stat-val" id="streak">0 🔥</div><div class="stat-lbl">Jours consécutifs</div></div>
+  <div class="stat"><div class="stat-val" id="total-done">0</div><div class="stat-lbl">Blocs complétés</div></div>
+</div>
+
+<div class="congrats" id="congrats">🎉 Journée complète ! T'assures LeCocoJ !</div>
+
+<div class="day-tabs" id="day-tabs"></div>
+<div class="day-label" id="day-label"></div>
+<div class="blocks" id="blocks"></div>
+
+<div class="week-section">
+  <div class="week-title">Progression de la semaine</div>
+  <div class="bars" id="week-bars"></div>
+</div>
+
+<button class="reset-btn" onclick="resetWeek()">↺ Réinitialiser la semaine</button>
+
+<script>
+const DAYS = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+const DAYS_FULL = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
+
+const CATS = {
+  boulot:  { color: '#378ADD' },
+  dj:      { color: '#7F77DD' },
+  sport:   { color: '#4CAF50' },
+  azure:   { color: '#FF9800' },
+  reseaux: { color: '#F4511E' },
+  app:     { color: '#E91E8C' },
+  couple:  { color: '#1D9E75' },
+  maison:  { color: '#9E9E9E' },
+};
+
+const SCHEDULE = {
+  0: [
+    { id:'l1', cat:'boulot',  label:'Boulot',          time:'8h15 – 17h' },
+    { id:'l2', cat:'sport',   label:'Sport',            time:'17h30 – 19h' },
+    { id:'l3', cat:'couple',  label:'Dîner en couple',  time:'19h – 20h' },
+    { id:'l4', cat:'azure',   label:'Azure 45 min',     time:'20h – 21h' },
+  ],
+  1: [
+    { id:'m1', cat:'boulot',  label:'Boulot',           time:'8h15 – 17h' },
+    { id:'m2', cat:'app',     label:'App alcool',        time:'17h30 – 19h' },
+    { id:'m3', cat:'couple',  label:'Dîner en couple',   time:'19h – 20h' },
+    { id:'m4', cat:'reseaux', label:'Réseaux 30 min',    time:'20h – 21h' },
+  ],
+  2: [
+    { id:'me1', cat:'boulot',  label:'Boulot',            time:'8h15 – 17h' },
+    { id:'me2', cat:'maison',  label:'Ménage rapide',      time:'17h – 17h30' },
+    { id:'me3', cat:'sport',   label:'Sport',              time:'17h30 – 19h' },
+    { id:'me4', cat:'couple',  label:'Dîner en couple',    time:'19h – 20h' },
+    { id:'me5', cat:'azure',   label:'Azure 45 min',       time:'20h – 21h' },
+    { id:'me6', cat:'dj',      label:'Mix maison',         time:'21h+' },
+  ],
+  3: [
+    { id:'j1', cat:'boulot',  label:'Boulot',           time:'8h15 – 17h' },
+    { id:'j2', cat:'app',     label:'App alcool',        time:'17h30 – 19h' },
+    { id:'j3', cat:'couple',  label:'Dîner en couple',   time:'19h – 20h' },
+    { id:'j4', cat:'azure',   label:'Azure 45 min',      time:'20h – 21h' },
+  ],
+  4: [
+    { id:'v1', cat:'boulot',  label:"Boulot jusqu'à 12h", time:'8h15 – 12h' },
+    { id:'v2', cat:'reseaux', label:'Réseaux 30 min',      time:'17h – 17h30' },
+    { id:'v3', cat:'dj',      label:'Montage CapCut',       time:'17h30 – 19h' },
+    { id:'v4', cat:'couple',  label:'Dîner / soirée couple',time:'19h – 20h' },
+    { id:'v5', cat:'reseaux', label:'Post IG + TikTok',     time:'20h pile' },
+  ],
+  5: [
+    { id:'s1', cat:'dj',     label:'Mix / Insta360',     time:'Après-midi' },
+    { id:'s2', cat:'couple', label:'Soirée couple',       time:'19h – 20h' },
+    { id:'s3', cat:'dj',     label:'Mix chill / contenu', time:'20h – 21h' },
+  ],
+  6: [
+    { id:'d1', cat:'maison', label:'Ménage + lessive',    time:'Matin' },
+    { id:'d2', cat:'maison', label:'Courses + prep semaine', time:'Après-midi' },
+    { id:'d3', cat:'couple', label:'Temps couple',         time:'Après-midi' },
+    { id:'d4', cat:'couple', label:'Repas prep semaine',   time:'19h – 20h' },
+  ],
+};
+
+let state = {};
+try { state = JSON.parse(localStorage.getItem('lecocoj_v2') || '{}'); } catch(e) {}
+
+let currentDay = new Date().getDay();
+currentDay = currentDay === 0 ? 6 : currentDay - 1;
+
+function save() {
+  try { localStorage.setItem('lecocoj_v2', JSON.stringify(state)); } catch(e) {}
+}
+
+function toggle(dayIdx, blockId) {
+  const key = dayIdx + '_' + blockId;
+  if (state[key] === 'done') delete state[key];
+  else state[key] = 'done';
+  save();
+  render();
+}
+
+function skipBlock(e, dayIdx, blockId) {
+  e.stopPropagation();
+  const key = dayIdx + '_' + blockId;
+  if (state[key] === 'skip') delete state[key];
+  else state[key] = 'skip';
+  save();
+  render();
+}
+
+function getDayPct(i) {
+  const blocks = SCHEDULE[i] || [];
+  if (!blocks.length) return 0;
+  const done = blocks.filter(b => state[i + '_' + b.id] === 'done').length;
+  return Math.round(done / blocks.length * 100);
+}
+
+function render() {
+  renderTabs();
+  renderBlocks(currentDay);
+  renderStats();
+  renderBars();
+}
+
+function renderTabs() {
+  document.getElementById('day-tabs').innerHTML = DAYS.map((d, i) => {
+    const blocks = SCHEDULE[i] || [];
+    const done = blocks.filter(b => state[i + '_' + b.id] === 'done').length;
+    const pct = blocks.length ? Math.round(done / blocks.length * 100) : 0;
+    const badge = done > 0
+      ? '<span class="badge ' + (pct === 100 ? 'badge-ok' : 'badge-part') + '">' + done + '</span>'
+      : '';
+    return '<button class="dtab ' + (i === currentDay ? 'active' : '') + '" onclick="switchDay(' + i + ')">' + d + badge + '</button>';
+  }).join('');
+  document.getElementById('day-label').textContent = DAYS_FULL[currentDay];
+}
+
+function renderBlocks(dayIdx) {
+  const blocks = SCHEDULE[dayIdx] || [];
+  document.getElementById('blocks').innerHTML = blocks.map(b => {
+    const key = dayIdx + '_' + b.id;
+    const status = state[key];
+    const isDone = status === 'done';
+    const isSkip = status === 'skip';
+    const cat = CATS[b.cat] || { color: '#ccc' };
+    return '<div class="block-row ' + (isDone ? 'done' : '') + ' ' + (isSkip ? 'skip' : '') + '" onclick="toggle(' + dayIdx + ',\'' + b.id + '\')">'
+      + '<div class="check">' + (isDone ? '✓' : '') + '</div>'
+      + '<div class="bcat" style="background:' + cat.color + '"></div>'
+      + '<div class="binfo"><div class="blabel">' + b.label + '</div><div class="btime">' + b.time + '</div></div>'
+      + '<button class="skip-btn" onclick="skipBlock(event,' + dayIdx + ',\'' + b.id + '\')">' + (isSkip ? 'annuler' : 'skip') + '</button>'
+      + '</div>';
+  }).join('');
+
+  const pct = getDayPct(dayIdx);
+  document.getElementById('congrats').style.display = pct === 100 ? 'block' : 'none';
+}
+
+function renderStats() {
+  document.getElementById('today-score').textContent = getDayPct(currentDay) + '%';
+  let totalDone = 0, totalBlocks = 0;
+  for (let i = 0; i < 7; i++) {
+    const blocks = SCHEDULE[i] || [];
+    totalBlocks += blocks.length;
+    totalDone += blocks.filter(b => state[i + '_' + b.id] === 'done').length;
+  }
+  document.getElementById('week-score').textContent = totalBlocks ? Math.round(totalDone / totalBlocks * 100) + '%' : '0%';
+  document.getElementById('total-done').textContent = totalDone;
+  let streak = 0;
+  for (let i = currentDay; i >= 0; i--) {
+    if (getDayPct(i) >= 50) streak++;
+    else break;
+  }
+  document.getElementById('streak').textContent = streak + ' 🔥';
+}
+
+function renderBars() {
+  document.getElementById('week-bars').innerHTML = DAYS.map((d, i) => {
+    const pct = getDayPct(i);
+    const color = pct >= 80 ? '#4CAF50' : pct >= 40 ? '#FF9800' : '#e0e0e0';
+    const h = Math.max(4, Math.round(pct * 0.6));
+    return '<div class="bar-wrap">'
+      + '<div class="bar-pct">' + (pct > 0 ? pct + '%' : '') + '</div>'
+      + '<div class="bar-fill" style="height:' + h + 'px;background:' + color + '"></div>'
+      + '<div class="bar-day">' + d + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+function switchDay(idx) {
+  currentDay = idx;
+  render();
+}
+
+function resetWeek() {
+  if (confirm('Réinitialiser toute la semaine ?')) {
+    state = {};
+    save();
+    render();
+  }
+}
+
+render();
+</script>
+</body>
+</html>
